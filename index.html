@@ -1,187 +1,389 @@
-# 🚀 Complete Setup Guide - Auto-Updating Leaderboard
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Defaults Challenge - Leaderboard</title>
+  <meta name="description" content="Residential Halls Sustainability Competition 2025-26">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    
+    // =====================================================
+    // 🔴 REPLACE THIS URL WITH YOUR WEB APP URL 🔴
+    // =====================================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbzXKyI0jyDvlzXGce522pBybzn33mmOYWiXi8ZrmgwuKdumjZI1hX1FSz5eZsM8VoDvgg/exec";
+    // =====================================================
+    
+    const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf5QGBOligt_emBLdADbw8l7OJgBLRWJdiOtL5EbDIPbthPqw/viewform";
 
-This will take about 15-20 minutes total. Follow each step carefully!
+    // Icon component
+    const Icon = ({ name, className }) => {
+      const ref = React.useRef(null);
+      useEffect(() => {
+        if (ref.current) {
+          ref.current.innerHTML = '';
+          const icon = lucide.createElement(lucide.icons[name]);
+          icon.setAttribute('class', className || 'w-5 h-5');
+          ref.current.appendChild(icon);
+        }
+      }, [name, className]);
+      return <span ref={ref} className="inline-flex items-center justify-center" />;
+    };
 
----
+    // Hall colors
+    const hallColors = {
+      'IJw': { bg: 'from-emerald-500 to-teal-600', light: 'bg-emerald-50', medium: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300' },
+      'EFw': { bg: 'from-blue-500 to-indigo-600', light: 'bg-blue-50', medium: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
+      'ABw': { bg: 'from-violet-500 to-purple-600', light: 'bg-violet-50', medium: 'bg-violet-100', text: 'text-violet-700', border: 'border-violet-300' },
+      'GHw': { bg: 'from-pink-500 to-rose-600', light: 'bg-pink-50', medium: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-300' },
+      'KLm': { bg: 'from-amber-500 to-orange-600', light: 'bg-amber-50', medium: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
+      'GHm': { bg: 'from-red-500 to-rose-600', light: 'bg-red-50', medium: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
+      'MNm': { bg: 'from-cyan-500 to-sky-600', light: 'bg-cyan-50', medium: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-300' },
+      'PQm': { bg: 'from-indigo-500 to-violet-600', light: 'bg-indigo-50', medium: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-300' },
+    };
+    const getHallColor = (hall) => hallColors[hall] || hallColors['MNm'];
 
-## PART 1: Update Your Apps Script (5 minutes)
+    // Loading component
+    const LoadingScreen = () => (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/50 to-teal-50/50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center animate-pulse-slow">
+            <Icon name="Leaf" className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-700 mb-2">Loading Leaderboard...</h2>
+          <p className="text-slate-500 text-sm">Fetching live data</p>
+        </div>
+      </div>
+    );
 
-### Step 1.1: Open Apps Script
-1. Open your **Google Form Responses spreadsheet**
-2. Click **Extensions** → **Apps Script**
-3. You'll see your existing script code
+    // Error component
+    const ErrorScreen = ({ error, onRetry }) => (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-red-50/50 to-orange-50/50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+            <Icon name="AlertCircle" className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-700 mb-2">Oops! Something went wrong</h2>
+          <p className="text-slate-500 text-sm mb-4">{error}</p>
+          <button 
+            onClick={onRetry}
+            className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
 
-### Step 1.2: Replace the Code
-1. **Select ALL** the existing code (Ctrl+A or Cmd+A)
-2. **Delete** it
-3. Open the file **`APPS_SCRIPT_CODE.js`** I provided
-4. **Copy ALL** the code from that file
-5. **Paste** it into Apps Script
+    // Components
+    const SubmitButton = () => (
+      <a href={FORM_URL} target="_blank" rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-full shadow-lg shadow-emerald-500/40 hover:shadow-xl hover:shadow-emerald-500/50 hover:scale-105 transition-all">
+        <Icon name="Leaf" className="w-5 h-5" />
+        <span>Submit Your Actions</span>
+        <Icon name="ExternalLink" className="w-4 h-4" />
+      </a>
+    );
 
-### Step 1.3: Save
-1. Click the **💾 Save** icon (or Ctrl+S)
-2. Wait for "Project saved" message
+    const PrizesBanner = () => (
+      <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-yellow-100 rounded-lg"><Icon name="Gift" className="w-5 h-5 text-yellow-600" /></div>
+          <div>
+            <h3 className="font-bold text-yellow-800">Monthly Prizes!</h3>
+            <p className="text-sm text-yellow-700">🥇 AED 200 • 🥈 AED 150 • 🥉 AED 100</p>
+          </div>
+        </div>
+      </div>
+    );
 
----
+    const RankBadge = ({ rank, size = 'md' }) => {
+      const sizes = { sm: { wrapper: 'w-7 h-7', text: 'text-xs', badge: 'w-4 h-4 text-[10px] -top-0.5 -right-0.5' }, md: { wrapper: 'w-10 h-10', text: 'text-sm', badge: 'w-5 h-5 text-xs -top-1 -right-1' } };
+      const s = sizes[size];
+      if (rank === 1) return (<div className="relative"><div className={`${s.wrapper} rounded-full bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-400/40`}><Icon name="Crown" className="w-4 h-4 text-yellow-900" /></div><div className={`absolute ${s.badge} bg-yellow-400 rounded-full flex items-center justify-center font-black text-yellow-900 border-2 border-white`}>1</div></div>);
+      if (rank === 2) return (<div className="relative"><div className={`${s.wrapper} rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 flex items-center justify-center shadow-md`}><Icon name="Medal" className="w-4 h-4 text-slate-600" /></div><div className={`absolute ${s.badge} bg-slate-300 rounded-full flex items-center justify-center font-black text-slate-700 border-2 border-white`}>2</div></div>);
+      if (rank === 3) return (<div className="relative"><div className={`${s.wrapper} rounded-full bg-gradient-to-br from-amber-600 via-amber-700 to-orange-800 flex items-center justify-center shadow-md`}><Icon name="Award" className="w-4 h-4 text-amber-200" /></div><div className={`absolute ${s.badge} bg-amber-700 rounded-full flex items-center justify-center font-black text-amber-100 border-2 border-white`}>3</div></div>);
+      return (<div className={`${s.wrapper} rounded-full bg-slate-700 flex items-center justify-center`}><span className={`${s.text} font-bold text-slate-200`}>{rank}</span></div>);
+    };
 
-## PART 2: Deploy as Web App (5 minutes)
+    const HallBadge = ({ hall, size = 'md' }) => {
+      const colors = getHallColor(hall);
+      return <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${colors.medium} ${colors.text}`}>{hall}</span>;
+    };
 
-### Step 2.1: Start New Deployment
-1. In Apps Script, click **Deploy** (blue button, top right)
-2. Click **New deployment**
+    const Podium = ({ data }) => {
+      const [first, second, third] = [data?.[0], data?.[1], data?.[2]];
+      if (!first) return <div className="text-center text-slate-400 py-8">No data yet for this phase</div>;
+      const pts = (s) => s?.points ?? s?.total ?? 0;
+      return (
+        <div className="relative h-52 flex items-end justify-center gap-2 mb-4">
+          {second && (<div className="flex flex-col items-center"><div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 flex items-center justify-center mb-1.5 shadow-xl border-4 border-white"><span className="text-lg font-black text-slate-700">2</span></div><p className="text-xs font-semibold text-slate-800 text-center max-w-16 truncate">{second.name?.split(' ')[0]}</p><HallBadge hall={second.hall} size="sm" /><div className="mt-2 w-20 bg-gradient-to-t from-slate-300 to-slate-200 rounded-t-lg flex flex-col items-center justify-end pb-2" style={{height:'75px'}}><span className="text-lg font-black text-slate-700">{pts(second)}</span><span className="text-xs text-slate-500">pts</span></div></div>)}
+          <div className="flex flex-col items-center"><div className="relative"><div className="absolute -top-4 left-1/2 -translate-x-1/2"><Icon name="Crown" className="w-5 h-5 text-yellow-500" /></div><div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-400 to-amber-500 flex items-center justify-center mb-1.5 shadow-2xl border-4 border-white ring-4 ring-yellow-300/50"><span className="text-xl font-black text-yellow-900">1</span></div></div><p className="text-sm font-bold text-slate-800 text-center max-w-20 truncate">{first.name?.split(' ')[0]}</p><HallBadge hall={first.hall} size="sm" /><div className="mt-2 w-24 bg-gradient-to-t from-yellow-400 to-yellow-300 rounded-t-lg flex flex-col items-center justify-end pb-2 shadow-lg" style={{height:'95px'}}><Icon name="Zap" className="w-4 h-4 text-yellow-700 mb-0.5" /><span className="text-xl font-black text-yellow-800">{pts(first)}</span><span className="text-xs text-yellow-700">pts</span></div></div>
+          {third && (<div className="flex flex-col items-center"><div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 via-amber-700 to-orange-800 flex items-center justify-center mb-1.5 shadow-xl border-4 border-white"><span className="text-base font-black text-amber-200">3</span></div><p className="text-xs font-semibold text-slate-800 text-center max-w-16 truncate">{third.name?.split(' ')[0]}</p><HallBadge hall={third.hall} size="sm" /><div className="mt-2 w-16 bg-gradient-to-t from-amber-600 to-amber-500 rounded-t-lg flex flex-col items-center justify-end pb-2" style={{height:'55px'}}><span className="text-base font-black text-amber-100">{pts(third)}</span><span className="text-xs text-amber-200">pts</span></div></div>)}
+        </div>
+      );
+    };
 
-### Step 2.2: Configure Deployment
-1. Click the **⚙️ gear icon** next to "Select type"
-2. Choose **Web app**
+    const StudentRow = ({ student, maxPoints, showPhases = false }) => {
+      const colors = getHallColor(student.hall);
+      const points = student.points ?? student.total ?? 0;
+      const barWidth = maxPoints > 0 ? (points / maxPoints) * 100 : 0;
+      return (
+        <div className="group flex items-center gap-3 p-3 rounded-xl bg-white hover:bg-slate-50 transition-all border border-slate-100 hover:border-slate-200 hover:shadow-md">
+          <RankBadge rank={student.rank} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1"><h3 className="font-semibold text-slate-800 truncate text-sm">{student.name}</h3><HallBadge hall={student.hall} /></div>
+            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full bg-gradient-to-r ${colors.bg} rounded-full transition-all duration-500`} style={{width:`${barWidth}%`}} /></div>
+          </div>
+          {showPhases ? (
+            <div className="flex items-center gap-3 text-right">
+              <div className="text-center hidden sm:block"><p className="text-xs text-slate-400">Fall</p><p className="text-sm font-semibold text-slate-600">{student.fall || '-'}</p></div>
+              <div className="text-center hidden sm:block"><p className="text-xs text-slate-400">P1</p><p className="text-sm font-semibold text-slate-600">{student.p1 || '-'}</p></div>
+              <div className="text-center sm:border-l sm:pl-3 border-slate-200"><p className="text-xs text-slate-400">Total</p><p className="text-lg font-black text-emerald-600">{student.total}</p></div>
+            </div>
+          ) : (
+            <div className="text-right"><p className="text-lg font-black text-slate-800">{points}</p></div>
+          )}
+        </div>
+      );
+    };
 
-3. Fill in:
-   - **Description**: `Leaderboard API`
-   - **Execute as**: `Me (your email)`
-   - **Who has access**: `Anyone` ⚠️ **IMPORTANT!**
+    const HallCard = ({ hall, rank, maxPoints }) => {
+      const colors = getHallColor(hall.name);
+      const percentage = maxPoints > 0 ? (hall.points / maxPoints) * 100 : 0;
+      return (
+        <div className={`relative overflow-hidden rounded-xl p-3 ${colors.light} border-2 ${colors.border} transition-all hover:scale-[1.01] hover:shadow-md`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${colors.bg} flex items-center justify-center shadow-md`}><span className="text-white font-black text-sm">{rank}</span></div>
+              <div><h3 className={`font-bold text-sm ${colors.text}`}>{hall.name}</h3><p className="text-xs text-slate-500">{hall.students} participant{hall.students !== 1 ? 's' : ''}</p></div>
+            </div>
+            <div className="text-right"><p className={`text-xl font-black ${colors.text}`}>{hall.points}</p><p className="text-xs text-slate-500">points</p></div>
+          </div>
+          <div className="h-2 bg-white/70 rounded-full overflow-hidden"><div className={`h-full bg-gradient-to-r ${colors.bg} rounded-full transition-all duration-700`} style={{width:`${percentage}%`}} /></div>
+        </div>
+      );
+    };
 
-4. Click **Deploy**
+    const HallDropdown = ({ selected, onChange, halls }) => {
+      const [open, setOpen] = useState(false);
+      const colors = getHallColor(selected);
+      return (
+        <div className="relative">
+          <button onClick={() => setOpen(!open)} className={`flex items-center gap-2 px-4 py-2 rounded-xl ${colors.medium} ${colors.text} font-semibold border-2 ${colors.border} hover:shadow-md transition-all`}>
+            {selected}<Icon name="ChevronDown" className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+          {open && (
+            <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-20 min-w-32">
+              {halls.map(h => (<button key={h} onClick={() => { onChange(h); setOpen(false); }} className={`w-full px-4 py-2 text-left hover:bg-slate-50 ${selected === h ? `${getHallColor(h).light} ${getHallColor(h).text} font-bold` : 'text-slate-700'} transition-colors`}>{h}</button>))}
+            </div>
+          )}
+        </div>
+      );
+    };
 
-### Step 2.3: Authorize
-1. Click **Authorize access**
-2. Choose your Google account
-3. If you see "Google hasn't verified this app":
-   - Click **Advanced**
-   - Click **Go to [project name] (unsafe)**
-4. Click **Allow**
+    const ChallengeTab = ({ iconName, title, subtitle, color, data }) => {
+      const maxPoints = data?.[0]?.total || 1;
+      return (
+        <div className="space-y-6">
+          <div className={`bg-gradient-to-r ${color} rounded-2xl p-5 text-white`}>
+            <div className="flex items-center gap-3"><div className="p-2 bg-white/20 rounded-xl"><Icon name={iconName} className="w-6 h-6" /></div><div><h2 className="text-xl font-bold">{title}</h2><p className="text-white/80 text-sm">{subtitle}</p></div></div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><Podium data={data} /></div>
+          <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100">
+            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="Star" className="w-5 h-5 text-emerald-500" /><span>All Participants</span></h3>
+            <div className="space-y-2">{data?.map((s, i) => <StudentRow key={i} student={{ ...s, rank: i + 1 }} maxPoints={maxPoints} showPhases />)}</div>
+          </div>
+        </div>
+      );
+    };
 
-### Step 2.4: Copy Your Web App URL
-After authorization, you'll see a URL like:
-```
-https://script.google.com/macros/s/AKfycbx.../exec
-```
+    // Main component
+    function SmartDefaultsLeaderboard() {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [activeTab, setActiveTab] = useState('current');
+      const [selectedHall, setSelectedHall] = useState('ABw');
 
-📋 **COPY THIS URL** - You'll need it in the next step!
+      const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const response = await fetch(API_URL);
+          if (!response.ok) throw new Error('Failed to fetch data');
+          const json = await response.json();
+          if (json.error) throw new Error(json.error);
+          setData(json);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
 
----
+      useEffect(() => { fetchData(); }, []);
 
-## PART 3: Update the HTML File (2 minutes)
+      if (loading) return <LoadingScreen />;
+      if (error) return <ErrorScreen error={error} onRetry={fetchData} />;
+      if (!data) return <ErrorScreen error="No data available" onRetry={fetchData} />;
 
-### Step 3.1: Open the HTML File
-1. Open **`index_live.html`** in any text editor (Notepad, TextEdit, VS Code, etc.)
+      const tabs = [
+        { id: 'current', label: 'Current Phase', icon: 'Trophy', badge: 'LIVE' },
+        { id: 'alltime', label: 'All-Time', icon: 'Star' },
+        { id: 'halls', label: 'Hall Battle', icon: 'Users' },
+        { id: 'steps', label: 'Green Steps', icon: 'Footprints' },
+        { id: 'bottles', label: 'Bottle & Can', icon: 'Recycle' },
+        { id: 'cutlery', label: 'No Cutlery', icon: 'UtensilsCrossed' },
+      ];
 
-### Step 3.2: Find and Replace the URL
-1. Press **Ctrl+F** (or Cmd+F) to search
-2. Search for: `PASTE_YOUR_WEB_APP_URL_HERE`
-3. You'll find this line near the top:
-```javascript
-const API_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
-```
+      // Map API data structure
+      const currentPhaseRankings = data.currentPhaseData?.students || [];
+      const allTimeRankings = data.allTime?.students || [];
+      const hallsAllTime = data.allTime?.halls || [];
+      const hallsCurrentPhase = data.currentPhaseData?.halls || [];
+      const allHallNames = hallsAllTime.map(h => h.name);
+      
+      // Phase labels
+      const phaseLabels = { p1: 'Phase 1', p2: 'Phase 2', p3: 'Phase 3', p4: 'Phase 4' };
+      const phaseDateLabels = { p1: 'Jan 15 – Feb 15', p2: 'Feb 15 – Mar 15', p3: 'Mar 15 – Apr 15', p4: 'Apr 15 – May 15' };
+      const currentPhaseName = phaseLabels[data.currentPhase] || 'Phase 1';
+      const currentPhaseLabel = phaseDateLabels[data.currentPhase] || 'Jan 15 – Feb 15';
 
-4. Replace `PASTE_YOUR_WEB_APP_URL_HERE` with YOUR web app URL
-5. It should look like:
-```javascript
-const API_URL = "https://script.google.com/macros/s/AKfycbx.../exec";
-```
+      const maxCurrentPoints = currentPhaseRankings[0]?.points || 1;
+      const maxAllTimePoints = allTimeRankings[0]?.total || 1;
+      const maxHallPointsCurrent = hallsCurrentPhase[0]?.points || 1;
+      const maxHallPointsAll = hallsAllTime[0]?.points || 1;
 
-### Step 3.3: Save the File
-1. Save the file
-2. **Rename** it to just `index.html` (remove the `_live` part)
+      const hallStudentsCurrent = currentPhaseRankings.filter(s => s.hall === selectedHall);
+      const hallRankCurrent = hallsCurrentPhase.findIndex(h => h.name === selectedHall) + 1;
+      const hallRankAllTime = hallsAllTime.findIndex(h => h.name === selectedHall) + 1;
+      const hallDataCurrent = hallsCurrentPhase.find(h => h.name === selectedHall);
+      const hallDataAllTime = hallsAllTime.find(h => h.name === selectedHall);
 
----
+      const lastUpdated = data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'Unknown';
 
-## PART 4: Upload to GitHub Pages (5 minutes)
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/50 to-teal-50/50 font-sans pb-24">
+          {/* Header */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white">
+            <div className="absolute inset-0 opacity-20"><div className="absolute top-5 left-5 w-32 h-32 bg-white rounded-full blur-3xl" /><div className="absolute bottom-5 right-10 w-48 h-48 bg-yellow-300 rounded-full blur-3xl" /></div>
+            <div className="relative max-w-4xl mx-auto px-4 py-6">
+              <div className="flex items-center gap-3"><div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm"><Icon name="Leaf" className="w-8 h-8" /></div><div><h1 className="text-2xl font-black tracking-tight">Smart Defaults Challenge</h1><p className="text-emerald-100 text-sm">Residential Halls • Spring 2026</p></div></div>
+            </div>
+          </div>
 
-### Step 4.1: Create GitHub Account (skip if you have one)
-1. Go to [github.com](https://github.com)
-2. Click **Sign up**
-3. Complete registration
+          {/* Navigation */}
+          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-lg border-b border-slate-200 shadow-sm">
+            <div className="max-w-4xl mx-auto px-4">
+              <div className="flex gap-1 py-2 overflow-x-auto scrollbar-hide">
+                {tabs.map(tab => (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-sm transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' : 'text-slate-600 hover:bg-slate-100'}`}>
+                    <Icon name={tab.icon} className="w-4 h-4" /><span>{tab.label}</span>
+                    {tab.badge && <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${activeTab === tab.id ? 'bg-white/20' : 'bg-red-100 text-red-600'}`}>{tab.badge}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-### Step 4.2: Create Repository
-1. Click **+** (top right) → **New repository**
-2. **Repository name**: `smart-defaults-leaderboard`
-3. **Description**: `Sustainability Challenge Leaderboard`
-4. Select **Public**
-5. ✅ Check **Add a README file**
-6. Click **Create repository**
+          {/* Content */}
+          <div className="max-w-4xl mx-auto px-4 py-6">
+            
+            {activeTab === 'current' && (
+              <div className="space-y-6">
+                <PrizesBanner />
+                <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 rounded-2xl p-5 text-white">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3"><div className="p-2 bg-white/20 rounded-xl"><Icon name="Calendar" className="w-6 h-6" /></div><div><h2 className="text-xl font-bold">{currentPhaseName}</h2><p className="text-white/80 text-sm">{currentPhaseLabel}</p></div></div>
+                    <div className="px-3 py-1 bg-white/20 rounded-full text-sm font-bold">🔥 LIVE</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white/10 rounded-lg p-3 text-center"><p className="text-2xl font-black">{data.currentPhaseData?.stats?.points || 0}</p><p className="text-xs text-white/70">Points</p></div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center"><p className="text-2xl font-black">{data.currentPhaseData?.stats?.participants || 0}</p><p className="text-xs text-white/70">Participants</p></div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center"><p className="text-2xl font-black">{data.currentPhaseData?.stats?.submissions || 0}</p><p className="text-xs text-white/70">Submissions</p></div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><h3 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2"><Icon name="Crown" className="w-5 h-5 text-yellow-500" /><span>Top Performers</span></h3><Podium data={currentPhaseRankings} /></div>
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="Star" className="w-5 h-5 text-emerald-500" /><span>Full Rankings</span></h3><div className="space-y-2">{currentPhaseRankings.map((s, i) => <StudentRow key={i} student={{...s, rank: i+1}} maxPoints={maxCurrentPoints} />)}</div></div>
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="Users" className="w-5 h-5 text-blue-500" /><span>Hall Rankings ({currentPhaseName})</span></h3><div className="grid gap-2">{hallsCurrentPhase.map((h, i) => <HallCard key={i} hall={h} rank={i + 1} maxPoints={maxHallPointsCurrent} />)}</div></div>
+              </div>
+            )}
 
-### Step 4.3: Upload HTML File
-1. Click **Add file** → **Upload files**
-2. Drag your `index.html` file
-3. Click **Commit changes**
+            {activeTab === 'alltime' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white">
+                  <div className="flex items-center gap-3 mb-4"><div className="p-2 bg-white/20 rounded-xl"><Icon name="Trophy" className="w-6 h-6" /></div><div><h2 className="text-xl font-bold">All-Time Rankings</h2><p className="text-white/80 text-sm">Fall 2025 + Spring 2026 Combined</p></div></div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white/10 rounded-lg p-3 text-center"><p className="text-2xl font-black">{data.allTime?.stats?.points?.toLocaleString() || 0}</p><p className="text-xs text-white/70">Total Points</p></div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center"><p className="text-2xl font-black">{data.allTime?.stats?.participants || 0}</p><p className="text-xs text-white/70">Participants</p></div>
+                    <div className="bg-white/10 rounded-lg p-3 text-center"><p className="text-2xl font-black">{data.allTime?.stats?.submissions || 0}</p><p className="text-xs text-white/70">Submissions</p></div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><h3 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2"><Icon name="Crown" className="w-5 h-5 text-yellow-500" /><span>All-Time Leaders</span></h3><Podium data={allTimeRankings} /></div>
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="Star" className="w-5 h-5 text-emerald-500" /><span>Full Rankings by Phase</span></h3><div className="space-y-2">{allTimeRankings.map((s, i) => <StudentRow key={i} student={{ ...s, rank: i + 1 }} maxPoints={maxAllTimePoints} showPhases />)}</div></div>
+              </div>
+            )}
 
-### Step 4.4: Enable GitHub Pages
-1. Go to **Settings** (tab)
-2. Scroll down left sidebar, click **Pages**
-3. Under **Source**, select:
-   - Branch: **main**
-   - Folder: **/ (root)**
-4. Click **Save**
-5. Wait 1-2 minutes
-6. Refresh the page - you'll see your URL:
-```
-✅ Your site is live at https://YOUR-USERNAME.github.io/smart-defaults-leaderboard/
-```
+            {activeTab === 'halls' && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100"><h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><Icon name="Trophy" className="w-5 h-5 text-yellow-500" /><span>All 8 Halls - Overall</span></h2><div className="grid gap-2">{hallsAllTime.map((h, i) => <HallCard key={i} hall={h} rank={i + 1} maxPoints={maxHallPointsAll} />)}</div></div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl shadow-xl p-5 border border-pink-100"><h3 className="text-base font-bold text-pink-800 mb-3">👩 Women's Halls</h3><div className="space-y-2">{hallsAllTime.filter(h => h.name.endsWith('w')).map((h, i) => (<div key={h.name} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-pink-100"><div className="flex items-center gap-2"><span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${getHallColor(h.name).bg} flex items-center justify-center font-bold text-white text-sm shadow`}>{i + 1}</span><span className="font-semibold text-slate-700">{h.name}</span></div><span className="font-black text-pink-600">{h.points} pts</span></div>))}</div></div>
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-xl p-5 border border-blue-100"><h3 className="text-base font-bold text-blue-800 mb-3">👨 Men's Halls</h3><div className="space-y-2">{hallsAllTime.filter(h => h.name.endsWith('m')).map((h, i) => (<div key={h.name} className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-blue-100"><div className="flex items-center gap-2"><span className={`w-7 h-7 rounded-lg bg-gradient-to-br ${getHallColor(h.name).bg} flex items-center justify-center font-bold text-white text-sm shadow`}>{i + 1}</span><span className="font-semibold text-slate-700">{h.name}</span></div><span className="font-black text-blue-600">{h.points} pts</span></div>))}</div></div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl p-5 border border-slate-100">
+                  <div className="flex items-center justify-between mb-4"><h3 className="text-base font-bold text-slate-800 flex items-center gap-2"><Icon name="Users" className="w-5 h-5 text-violet-500" /><span>My Hall</span></h3><HallDropdown selected={selectedHall} onChange={setSelectedHall} halls={allHallNames} /></div>
+                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                    <div className={`p-4 rounded-xl ${getHallColor(selectedHall).light} border ${getHallColor(selectedHall).border}`}><p className="text-xs text-slate-500 mb-1">{currentPhaseName} Rank</p><p className={`text-3xl font-black ${getHallColor(selectedHall).text}`}>#{hallRankCurrent || '-'}</p><p className="text-sm text-slate-600">{hallDataCurrent?.points || 0} points</p></div>
+                    <div className={`p-4 rounded-xl ${getHallColor(selectedHall).light} border ${getHallColor(selectedHall).border}`}><p className="text-xs text-slate-500 mb-1">All-Time Rank</p><p className={`text-3xl font-black ${getHallColor(selectedHall).text}`}>#{hallRankAllTime || '-'}</p><p className="text-sm text-slate-600">{hallDataAllTime?.points || 0} points</p></div>
+                  </div>
+                  <h4 className="font-semibold text-slate-700 mb-2">Top in {selectedHall} ({currentPhaseName})</h4>
+                  {hallStudentsCurrent.length > 0 ? (<div className="space-y-2">{hallStudentsCurrent.slice(0, 5).map((s, i) => (<StudentRow key={i} student={{ ...s, rank: i + 1 }} maxPoints={hallStudentsCurrent[0]?.points || 1} />))}</div>) : (<p className="text-slate-400 text-sm py-4 text-center">No submissions yet. Be the first!</p>)}
+                </div>
+              </div>
+            )}
 
----
+            {activeTab === 'steps' && <ChallengeTab iconName="Footprints" title="Green Steps Challenge" subtitle="Points earned by walking • Up to 10 pts/day" color="from-green-500 via-emerald-500 to-teal-500" data={data.challenges?.steps} />}
+            {activeTab === 'bottles' && <ChallengeTab iconName="Recycle" title="Bottle & Can Disposal" subtitle="Points for recycling • 5 pts/submission" color="from-blue-500 via-cyan-500 to-teal-500" data={data.challenges?.bottles} />}
+            {activeTab === 'cutlery' && <ChallengeTab iconName="UtensilsCrossed" title="Opt-Out of Plastic Cutlery" subtitle="Decline plastic cutlery • 2 pts/submission" color="from-purple-500 via-violet-500 to-indigo-500" data={data.challenges?.cutlery} />}
+          </div>
 
-## PART 5: Test It! 🎉
+          {/* Footer */}
+          <div className="bg-slate-800 text-slate-300 py-6 mt-8">
+            <div className="max-w-4xl mx-auto px-4 text-center">
+              <div className="flex items-center justify-center gap-2 mb-2"><Icon name="Leaf" className="w-4 h-4 text-emerald-400" /><span className="font-semibold text-white">Smart Defaults Challenge</span></div>
+              <p className="text-xs">SRLD × Sustainability • Making sustainable choices the default 🌍</p>
+              <p className="text-xs text-slate-500 mt-1">Last updated: {lastUpdated}</p>
+            </div>
+          </div>
 
-1. Open your GitHub Pages URL in a browser
-2. You should see the leaderboard with LIVE data!
-3. Have someone submit a form response
-4. Refresh the leaderboard page - it should update!
+          <SubmitButton />
+        </div>
+      );
+    }
 
----
-
-## 🔧 Troubleshooting
-
-### "Loading..." never goes away
-- Check that you replaced the URL correctly in `index.html`
-- Make sure the Web App is deployed with "Anyone" access
-- Check the Apps Script execution logs for errors
-
-### CORS Error in Console
-- Make sure "Who has access" is set to "Anyone" in the deployment
-- Try redeploying the web app
-
-### Data not updating after form submission
-- The leaderboard fetches fresh data on each page load
-- Just refresh the page!
-
-### Need to update the Apps Script?
-After making changes:
-1. Go to **Deploy** → **Manage deployments**
-2. Click the **✏️ pencil icon**
-3. Change version to **New version**
-4. Click **Deploy**
-
----
-
-## 📱 Share With Students!
-
-Your leaderboard URL:
-```
-https://YOUR-USERNAME.github.io/smart-defaults-leaderboard/
-```
-
-Share it via:
-- Email to residents
-- WhatsApp/group chats
-- QR code (generate at qr-code-generator.com)
-- Poster with link
-
----
-
-## ✅ What You Get
-
-- **Auto-updating**: Data refreshes every time someone opens the page
-- **No manual work**: Just let students submit forms
-- **Phase-aware**: Automatically tracks Fall 2025 and Spring phases
-- **Beautiful UI**: Works on mobile and desktop
-- **Free forever**: No hosting costs
-
----
-
-## Need Help?
-
-If something isn't working, send me:
-1. The exact error message (if any)
-2. A screenshot of the issue
-3. Which step you're stuck on
-
-Good luck! 🌿
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<SmartDefaultsLeaderboard />);
+  </script>
+</body>
+</html>
